@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Runtime state written next to the script (learned categories, backups)
+categories.json
+*_backup_*.json
+
+# Stray scratch files
+stuff.txt
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
