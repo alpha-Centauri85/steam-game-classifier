@@ -68,8 +68,8 @@ steam-game-classifier/
 
 1. **Setup** — Enter/confirm API key + Steam ID (pre-filled if remembered).
    Saved to gitignored `config.json`; a "forget" link clears it. Backend
-   checks whether Steam is running and warns (the file must be edited with
-   Steam closed).
+   checks whether Steam is running **on this machine** and warns (the file
+   must be edited with Steam closed).
 2. **Preview (dry run)** — Backend fetches owned games and categorises them.
    **Nothing is written to disk.** Returns a before→after view grouped into:
    - **Will change** — game, current category → proposed category (highlighted).
@@ -79,12 +79,36 @@ steam-game-classifier/
    (off by default = current safe behaviour).
 3. **Unknowns** — Each unrecognised game gets a dropdown of valid categories.
    Choices are saved as learned categories so they auto-match next time.
-4. **Apply** — Backend backs up the cloud JSON (timestamped, as today), writes
-   the assignments, saves learned choices, and shows a summary.
+4. **Apply** — Gated behind a **multi-machine safety acknowledgement** (see
+   below). Backend backs up the cloud JSON (timestamped, as today), writes
+   the assignments, saves learned choices, and shows a summary. The summary
+   reminds the user that other machines may need a Steam sign-out/in before
+   the change appears.
 
 **Preview/Apply guarantee:** Apply writes exactly what the preview showed,
 nothing more. The end summary reflects the same list, so the change is
 traceable from preview through to result.
+
+### Multi-machine safety (Steam Cloud sync)
+
+Steam collections sync through Steam Cloud. Editing the local collections file
+while Steam is open and signed in on another machine can cause that machine to
+either not show the change until it re-syncs (sign out/in) or overwrite the
+edit on its next sync. This is a known failure mode observed in practice.
+
+The backend can only detect the Steam instance **on the machine it runs on**;
+it cannot see Steam on the user's other devices. The safeguard is therefore
+two parts:
+
+- **Detectable:** block Apply if local Steam is running (`/api/steam-status`).
+- **Not detectable:** before Apply, show a prominent warning explaining the
+  Cloud-sync issue and require an explicit acknowledgement checkbox —
+  *"I have closed and signed out of Steam on all my other devices."* Apply is
+  disabled until it is ticked. The UI states plainly that the app cannot
+  verify the other devices; this is the user's confirmation, not a check.
+
+The warning copy must say: close **and sign out of** Steam on **all** machines,
+not just close it, because a signed-in-but-idle client can still re-sync.
 
 ## API (all local, localhost only)
 
@@ -96,14 +120,19 @@ traceable from preview through to result.
 - `POST /api/preview` — body: key, id, overwrite flag. Returns the grouped
   before→after change set and the list of unknown games. Writes nothing.
 - `POST /api/apply` — body: the final assignments (including resolved
-  unknowns). Backs up, writes, saves learned categories, returns a summary.
+  unknowns) plus the multi-machine acknowledgement flag. Rejected if local
+  Steam is running or the acknowledgement is missing. Backs up, writes, saves
+  learned categories, returns a summary.
 
 ## Error handling
 
 Each of these returns a clear message the UI displays, instead of crashing:
 
 - Steam cloud JSON not found (bad/nonexistent install path).
-- Steam is currently running (warn before apply; block apply).
+- Steam is currently running on this machine (block apply).
+- Multi-machine acknowledgement not ticked (block apply; see Multi-machine
+  safety). Backend cannot detect other devices, so this is a hard gate on
+  the user's confirmation.
 - Invalid API key or malformed/wrong Steam ID.
 - Steam Web API unreachable / network error / non-200 response.
 - Malformed existing `categories.json` (warn, continue with built-in map).
