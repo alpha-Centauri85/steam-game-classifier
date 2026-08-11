@@ -67,9 +67,12 @@ steam-game-classifier/
 ## Wizard flow
 
 1. **Setup** — Enter/confirm API key + Steam ID (pre-filled if remembered).
-   Saved to gitignored `config.json`; a "forget" link clears it. Backend
-   checks whether Steam is running **on this machine** and warns (the file
-   must be edited with Steam closed).
+   Saved to gitignored `config.json`; a "forget" link clears it. Each field
+   has inline help explaining how to obtain it. The Steam ID field offers an
+   in-app **look-up** (enter a profile name or URL → resolved via the API,
+   see `/api/resolve-id`) so the user needn't rely on third-party finder
+   sites. Backend checks whether Steam is running **on this machine** and
+   warns (the file must be edited with Steam closed).
 2. **Preview (dry run)** — Backend fetches owned games and categorises them.
    **Nothing is written to disk.** Returns a before→after view grouped into:
    - **Will change** — game, current category → proposed category (highlighted).
@@ -116,6 +119,12 @@ not just close it, because a signed-in-but-idle client can still re-sync.
 - `POST /api/config` — save API key + Steam ID (+ optional Steam path).
 - `DELETE /api/config` — forget stored credentials.
 - `GET  /api/steam-status` — is Steam running? is the cloud JSON found?
+- `POST /api/resolve-id` — body: API key + a profile name or profile URL.
+  Resolves it to a 64-bit Steam ID via the Steam Web API `ResolveVanityURL`
+  endpoint (or extracts the number directly if a `/profiles/7656…` URL is
+  pasted). Lets the user avoid third-party ID-finder sites, which are often
+  region/Cloudflare-blocked. Returns the resolved ID or a clear "couldn't
+  find that profile" error.
 - `GET  /api/categories` — list of valid category names for dropdowns.
 - `POST /api/preview` — body: key, id, overwrite flag. Returns the grouped
   before→after change set and the list of unknown games. Writes nothing.
