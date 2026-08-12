@@ -2,7 +2,10 @@
 
 import json
 import re
+import shutil
+import uuid
 import requests  # default http
+from datetime import datetime
 from pathlib import Path
 
 GENRE_TO_CATEGORY = {
@@ -743,6 +746,85 @@ def build_change_set(owned, data, learned=None, overwrite=False):
         })
 
     return {"will_change": will_change, "unknown": unknown, "no_change": no_change}
+
+
+def backup(path):
+    path = Path(path)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dst = path.parent / f"{path.stem}_backup_{ts}{path.suffix}"
+    shutil.copy2(path, dst)
+    return dst
+
+
+def apply_assignments(cloud_json_path, assignments, overwrite=False):
+    cloud_json_path = Path(cloud_json_path)
+    backup_path = backup(cloud_json_path)
+
+    with open(cloud_json_path, encoding="utf-8") as f:
+        data = json.load(f)
+    collections, _, max_version = load_collections(data)
+    next_version = max_version + 1
+    managed_displays = set(CATEGORY_TO_COLLECTION.values())
+
+    # Removals (overwrite only): pull each moved game out of other managed collections.
+    removals = {}
+    if overwrite:
+        for category_key, app_ids in assignments.items():
+            target_display = collection_display(category_key)
+            for app_id in app_ids:
+                for coll_name, info in collections.items():
+                    if coll_name == target_display or coll_name not in managed_displays:
+                        continue
+                    if app_id in info["added"]:
+                        removals.setdefault(coll_name, set()).add(app_id)
+
+    for coll_name, ids in removals.items():
+        info = collections[coll_name]
+        new_ids = info["added"] - ids
+        val_obj = json.loads(data[info["idx"]][1].get("value", "{}"))
+        val_obj["added"] = sorted(new_ids)
+        val_obj.pop("removed", None)
+        data[info["idx"]][1]["value"] = json.dumps(val_obj)
+        data[info["idx"]][1]["timestamp"] = int(datetime.now().timestamp())
+        data[info["idx"]][1]["version"] = str(next_version)
+        next_version += 1
+        collections[coll_name]["added"] = new_ids
+
+    created, updated, assigned = [], [], 0
+    for category_key, app_ids in assignments.items():
+        if not app_ids:
+            continue
+        display = collection_display(category_key)
+        assigned += len(app_ids)
+        if display in collections:
+            info = collections[display]
+            new_ids = info["added"] | set(app_ids)
+            val_obj = json.loads(data[info["idx"]][1].get("value", "{}"))
+            val_obj["added"] = sorted(new_ids)
+            val_obj.pop("removed", None)
+            data[info["idx"]][1]["value"] = json.dumps(val_obj)
+            data[info["idx"]][1]["timestamp"] = int(datetime.now().timestamp())
+            data[info["idx"]][1]["version"] = str(next_version)
+            updated.append(display)
+        else:
+            cid = str(uuid.uuid4())[:8]
+            val_obj = {"id": cid, "name": display, "added": sorted(app_ids), "removed": []}
+            data.append([f"user-collections.{cid}", {
+                "key": f"user-collections.{cid}",
+                "timestamp": int(datetime.now().timestamp()),
+                "value": json.dumps(val_obj),
+                "version": str(next_version),
+                "conflictResolutionMethod": "custom",
+                "strMethodId": "union-collections",
+            }])
+            created.append(display)
+        next_version += 1
+
+    with open(cloud_json_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, separators=(",", ":"))
+
+    return {"assigned": assigned, "backup": backup_path.name,
+            "created": created, "updated": updated}
 
 
 def genre_suggestion(app_id, http=requests):
