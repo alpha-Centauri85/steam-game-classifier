@@ -663,6 +663,88 @@ def resolve_steam_id(api_key, profile_input, http=requests):
     raise ValueError("Could not find that profile.")
 
 
+def load_collections(data):
+    """
+    Returns:
+        collections  dict: display_name → {id, added (set), entry_index}
+        all_categorized set: all app IDs already in any collection
+        max_version  int
+    """
+    collections     = {}
+    all_categorized = set()
+    max_version     = 0
+
+    for idx, (k, v) in enumerate(data):
+        if not k.startswith("user-collections"):
+            continue
+        if v.get("is_deleted"):
+            continue
+        try:
+            val  = json.loads(v.get("value", "{}"))
+            name = val.get("name", "")
+            cid  = val.get("id", "")
+            added = set(val.get("added", []))
+            all_categorized |= added
+            collections[name] = {
+                "id":    cid,
+                "added": added,
+                "idx":   idx,
+            }
+            ver = int(v.get("version", "0"))
+            if ver > max_version:
+                max_version = ver
+        except Exception:
+            pass
+
+    return collections, all_categorized, max_version
+
+
+def _current_collection_for(app_id, collections):
+    """Display name of the managed collection this app currently sits in, else None."""
+    managed = set(CATEGORY_TO_COLLECTION.values())
+    for name, info in collections.items():
+        if name in managed and app_id in info["added"]:
+            return name
+    return None
+
+
+def build_change_set(owned, data, learned=None, overwrite=False):
+    learned = learned or {}
+    collections, already_categorised, _ = load_collections(data)
+
+    will_change, unknown = [], []
+    no_change = 0
+
+    for app_id, name in sorted(owned.items(), key=lambda x: x[1].lower()):
+        current = _current_collection_for(app_id, collections)
+        if app_id in already_categorised and not overwrite:
+            no_change += 1
+            continue
+
+        category = categorize(name, learned)
+        if category is None:
+            if current is None:
+                unknown.append({"app_id": app_id, "name": name})
+            else:
+                no_change += 1
+            continue
+
+        target_display = collection_display(category)
+        if current == target_display:
+            no_change += 1
+            continue
+
+        will_change.append({
+            "app_id": app_id,
+            "name": name,
+            "from": current,
+            "to": category,
+            "to_display": target_display,
+        })
+
+    return {"will_change": will_change, "unknown": unknown, "no_change": no_change}
+
+
 def genre_suggestion(app_id, http=requests):
     try:
         url = (
