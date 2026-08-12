@@ -1,5 +1,8 @@
 """Core Steam game categorisation logic, extracted from steam_categorizer_v2.py."""
 
+import json
+from pathlib import Path
+
 GENRE_TO_CATEGORY = {
     "action":            "ACTION/ADVENTURE",
     "adventure":         "ACTION/ADVENTURE",
@@ -545,3 +548,22 @@ def valid_categories():
 
 def collection_display(category_key):
     return CATEGORY_TO_COLLECTION.get(category_key, category_key)
+
+
+def load_learned(path):
+    path = Path(path)
+    if path.exists():
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_learned(path, name, category):
+    path = Path(path)
+    learned = load_learned(path)
+    learned[name.lower().strip()] = category
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(learned, f, indent=2, ensure_ascii=False, sort_keys=True)
