@@ -1,6 +1,8 @@
 """Core Steam game categorisation logic, extracted from steam_categorizer_v2.py."""
 
 import json
+import re
+import requests  # default http
 from pathlib import Path
 
 GENRE_TO_CATEGORY = {
@@ -627,3 +629,56 @@ def is_steam_running():
         return out.returncode == 0
     except Exception:
         return False
+
+
+def get_owned_games(api_key, steam_id, http=requests):
+    url = (
+        "http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
+        f"?key={api_key}&steamid={steam_id}&include_appinfo=1&format=json"
+    )
+    r = http.get(url, timeout=15)
+    r.raise_for_status()
+    games = r.json().get("response", {}).get("games", [])
+    return {g["appid"]: g["name"] for g in games}
+
+
+def resolve_steam_id(api_key, profile_input, http=requests):
+    text = profile_input.strip()
+    m = re.search(r"/profiles/(\d{17})", text)
+    if m:
+        return m.group(1)
+    if re.fullmatch(r"\d{17}", text):
+        return text
+    m = re.search(r"/id/([^/]+)", text)
+    vanity = m.group(1) if m else text
+    url = (
+        "http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/"
+        f"?key={api_key}&vanityurl={vanity}"
+    )
+    r = http.get(url, timeout=15)
+    r.raise_for_status()
+    resp = r.json().get("response", {})
+    if resp.get("success") == 1 and resp.get("steamid"):
+        return resp["steamid"]
+    raise ValueError("Could not find that profile.")
+
+
+def genre_suggestion(app_id, http=requests):
+    try:
+        url = (
+            "https://store.steampowered.com/api/appdetails"
+            f"?appids={app_id}&filters=genres,categories"
+        )
+        r = http.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json().get(str(app_id), {})
+        if not data.get("success"):
+            return None, []
+        genres = [g["description"] for g in data["data"].get("genres", [])]
+        for g in genres:
+            mapped = GENRE_TO_CATEGORY.get(g.lower())
+            if mapped:
+                return mapped, genres
+        return None, genres
+    except Exception:
+        return None, []
