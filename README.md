@@ -8,6 +8,33 @@ results back into Steam's local collections file.
 New or unrecognised games can be categorised interactively, and your choices are
 remembered for next time.
 
+## Web app (recommended)
+
+A guided, step-by-step wizard that runs in your browser.
+
+### Requirements
+
+- Python 3
+- `pip install -r requirements.txt`
+
+### Launch
+
+Double-click `run_web.bat`, or run `python app.py` from a terminal. A browser
+tab opens automatically at http://127.0.0.1:5000. The wizard walks you through
+connecting your Steam account, previewing changes, sorting any new games, and
+applying the result.
+
+> **Close and sign out of Steam on every device before applying.** Collections
+> sync through Steam Cloud, so if Steam is still signed in on another PC,
+> laptop, or Steam Deck, it can undo your changes on its next sync or hide
+> them until that device signs out and back in. The wizard's final step asks
+> you to confirm this before it lets you apply anything.
+
+## Command-line version
+
+The steps below describe the original command-line tool, which still works
+if you prefer it to the web app.
+
 ## Requirements
 
 - Python 3

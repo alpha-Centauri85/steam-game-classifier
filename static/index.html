@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steam Classifier</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo-dot"></div>
+    <h1>Steam <span>Classifier</span></h1>
+    <button class="gear" title="Settings">&#9881;</button>
+  </div>
+
+  <div class="card">
+    <div class="rail">
+      <div class="seg" data-seg="0"><span class="n"><span class="num">1</span></span>Setup</div>
+      <div class="seg" data-seg="1"><span class="n"><span class="num">2</span></span>Preview</div>
+      <div class="seg" data-seg="2"><span class="n"><span class="num">3</span></span>New&nbsp;games</div>
+      <div class="seg" data-seg="3"><span class="n"><span class="num">4</span></span>Apply</div>
+    </div>
+
+    <div class="body">
+
+      <!-- STEP 1 -->
+      <section class="step" data-step="0">
+        <h2>Connect your Steam account</h2>
+        <p class="lede">These are remembered on this PC so you only enter them once.</p>
+
+        <div class="banner ok" id="setup-banner">
+          <span class="ico">&#10003;</span>
+          <span id="setup-banner-text">Checking Steam status&hellip;</span>
+        </div>
+
+        <div class="field">
+          <div class="lab-row">
+            <span class="lab">Steam Web API key</span>
+            <details class="help">
+              <summary>How do I get this?</summary>
+              <div class="help-body">
+                <ol>
+                  <li>Go to <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">steamcommunity.com/dev/apikey</a> and sign in.</li>
+                  <li>In the <strong>Domain Name</strong> box, type anything &mdash; <code>localhost</code> is fine. It doesn't need to be a real website.</li>
+                  <li>Tick the agreement and click <strong>Register</strong>.</li>
+                  <li>Copy the <strong>Key</strong> it shows you (a 32-character code) and paste it above.</li>
+                </ol>
+                <p class="tip" style="margin:8px 0 0">Keep this private &mdash; it's like a password for reading your library.</p>
+              </div>
+            </details>
+          </div>
+          <input type="text" id="api-key-input" placeholder="Paste your Steam Web API key" spellcheck="false">
+        </div>
+
+        <div class="field">
+          <div class="lab-row">
+            <span class="lab">64-bit Steam ID</span>
+            <details class="help">
+              <summary>How do I find this?</summary>
+              <div class="help-body">
+                <p style="margin:0 0 10px"><strong>Easiest &mdash; let the app find it.</strong> Type your Steam profile name or paste your profile URL below and click <strong>Look up</strong>; the app fills in your ID for you.</p>
+                <div style="display:flex; gap:8px; margin-bottom:12px">
+                  <input type="text" id="profile-input" placeholder="profile name or steamcommunity.com/id/&hellip;" style="flex:1; padding:8px 10px" spellcheck="false">
+                  <button class="btn blue" id="lookup-btn" style="padding:8px 14px">Look up</button>
+                </div>
+                <p style="margin:0 0 6px"><strong>Prefer to find it in Steam?</strong> No website needed:</p>
+                <ol>
+                  <li>In the Steam app, click your name (top-right) &rarr; <strong>View my profile</strong>.</li>
+                  <li>Right-click anywhere on the profile page &rarr; <strong>Copy Page URL</strong>.</li>
+                  <li>If it looks like <code>steamcommunity.com/profiles/7656119&hellip;</code>, that 17-digit number <em>is</em> your ID. Paste the whole URL above and we'll pull it out.</li>
+                </ol>
+                <p class="tip" style="margin:8px 0 0">A 64-bit Steam ID is 17 digits and starts with <code>76561</code>. Third-party finders (e.g. steamid.io) also work but are sometimes region-blocked.</p>
+                <div class="inline-error" id="lookup-error"></div>
+              </div>
+            </details>
+          </div>
+          <input type="text" id="steam-id-input" placeholder="76561198012345678" spellcheck="false">
+        </div>
+
+        <div class="inline-error" id="setup-error"></div>
+
+        <span class="forget" id="forget-link">Forget saved credentials</span>
+      </section>
+
+      <!-- STEP 2 -->
+      <section class="step" data-step="1">
+        <h2>Preview your changes</h2>
+        <p class="lede">This is a dry run &mdash; nothing is written yet. Here's exactly what will change and where.</p>
+
+        <div class="inline-error" id="preview-error"></div>
+
+        <div class="group">
+          <div class="group-head">Will change <span class="pill change" id="count-change">0</span></div>
+          <div class="rows" id="will-change-rows"></div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">Needs your input <span class="pill warn" id="count-unknown">0</span></div>
+          <div class="rows" id="unknown-preview-rows"></div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">No change <span class="pill" id="count-nochange">0</span></div>
+          <p class="muted-note">These games already sit in the right collection, so they're left untouched.</p>
+        </div>
+
+        <label class="toggle"><input type="checkbox" id="overwrite-checkbox"> Re-categorise games that already have a category</label>
+      </section>
+
+      <!-- STEP 3 -->
+      <section class="step" data-step="2">
+        <h2>A few new games</h2>
+        <p class="lede">These aren't in the built-in list. Pick a category and it's remembered for next time.</p>
+        <div class="rows" id="unknown-rows"></div>
+        <p class="muted-note">Learned choices are saved to <span style="font-family:var(--mono)">categories.json</span> on this PC.</p>
+      </section>
+
+      <!-- STEP 4 -->
+      <section class="step" data-step="3">
+        <h2>Ready to apply</h2>
+        <p class="lede" id="apply-lede">Games will be sorted into collections. Your library file is backed up first.</p>
+
+        <div class="inline-error" id="apply-error"></div>
+
+        <div class="gate" id="gate">
+          <h3>&#9888; Close Steam on every device first</h3>
+          <p>Collections sync through Steam Cloud. If Steam is open and signed in on another PC, laptop or Steam Deck, it can undo this change on its next sync, or hide it until that device signs out and back in.</p>
+          <label class="ack"><input type="checkbox" id="ack"> I have <strong>closed and signed out</strong> of Steam on all my other devices.</label>
+          <div class="cannot">This app can only see Steam on this PC &mdash; it can't check your other devices, so this is your confirmation.</div>
+        </div>
+      </section>
+
+      <!-- SUMMARY (post-apply) -->
+      <section class="step" data-step="4">
+        <div class="summary-hero">
+          <div class="big">&#127881;</div>
+          <h2>Done &mdash; your library is sorted</h2>
+          <p class="lede">You can open Steam again now.</p>
+        </div>
+        <div class="stat-grid" id="summary-stats"></div>
+        <p class="backup-line" id="backup-line"></p>
+        <div class="banner warn" style="margin-top:18px">
+          <span class="ico">&#8635;</span>
+          <span>On your other devices, sign out and back in to Steam to see the new collections.</span>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="foot">
+      <button class="btn ghost" id="back">&#8249; Back</button>
+      <button class="btn primary" id="next">Next &#8250;</button>
+    </div>
+  </div>
+
+  <p class="hint">Your data stays on this PC. Nothing is sent anywhere except the Steam Web API for game and profile lookups.</p>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
