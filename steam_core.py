@@ -555,6 +555,9 @@ def collection_display(category_key):
     return CATEGORY_TO_COLLECTION.get(category_key, category_key)
 
 
+CATEGORIES_FILE_DEFAULT = Path(__file__).parent / "categories.json"
+
+
 def load_learned(path):
     path = Path(path)
     if path.exists():
