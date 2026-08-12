@@ -74,7 +74,8 @@ def main():
     print(f"Cloud file:  {CLOUD_JSON}")
 
     if not args.dry_run:
-        core.backup(CLOUD_JSON)
+        backup_path = core.backup(CLOUD_JSON)
+        print(f"✓ Backup: {backup_path.name}")
     else:
         print("  [DRY RUN — nothing will be written]")
 
