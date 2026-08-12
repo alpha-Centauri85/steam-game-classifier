@@ -42,11 +42,11 @@
               <div class="help-body">
                 <ol>
                   <li>Go to <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">steamcommunity.com/dev/apikey</a> and sign in.</li>
-                  <li>In the <strong>Domain Name</strong> box, type anything &mdash; <code>localhost</code> is fine. It doesn't need to be a real website.</li>
+                  <li>In the <strong>Domain Name</strong> box, type anything, e.g. <code>localhost</code>. It doesn't need to be a real website.</li>
                   <li>Tick the agreement and click <strong>Register</strong>.</li>
                   <li>Copy the <strong>Key</strong> it shows you (a 32-character code) and paste it above.</li>
                 </ol>
-                <p class="tip" style="margin:8px 0 0">Keep this private &mdash; it's like a password for reading your library.</p>
+                <p class="tip" style="margin:8px 0 0">Keep this private, it's like a password for reading your library.</p>
               </div>
             </details>
           </div>
@@ -59,7 +59,7 @@
             <details class="help">
               <summary>How do I find this?</summary>
               <div class="help-body">
-                <p style="margin:0 0 10px"><strong>Easiest &mdash; let the app find it.</strong> Type your Steam profile name or paste your profile URL below and click <strong>Look up</strong>; the app fills in your ID for you.</p>
+                <p style="margin:0 0 10px"><strong>Easiest option: let the app find it.</strong> Type your Steam profile name or paste your profile URL below and click <strong>Look up</strong>; the app fills in your ID for you.</p>
                 <div style="display:flex; gap:8px; margin-bottom:12px">
                   <input type="text" id="profile-input" placeholder="profile name or steamcommunity.com/id/&hellip;" style="flex:1; padding:8px 10px" spellcheck="false">
                   <button class="btn blue" id="lookup-btn" style="padding:8px 14px">Look up</button>
@@ -86,7 +86,7 @@
       <!-- STEP 2 -->
       <section class="step" data-step="1">
         <h2>Preview your changes</h2>
-        <p class="lede">This is a dry run &mdash; nothing is written yet. Here's exactly what will change and where.</p>
+        <p class="lede">This is a dry run. Nothing is written yet. Here's exactly what will change and where.</p>
 
         <div class="inline-error" id="preview-error"></div>
 
@@ -127,7 +127,7 @@
           <h3>&#9888; Close Steam on every device first</h3>
           <p>Collections sync through Steam Cloud. If Steam is open and signed in on another PC, laptop or Steam Deck, it can undo this change on its next sync, or hide it until that device signs out and back in.</p>
           <label class="ack"><input type="checkbox" id="ack"> I have <strong>closed and signed out</strong> of Steam on all my other devices.</label>
-          <div class="cannot">This app can only see Steam on this PC &mdash; it can't check your other devices, so this is your confirmation.</div>
+          <div class="cannot">This app can only see Steam on this PC, so it can't check your other devices, so this is your confirmation.</div>
         </div>
       </section>
 
@@ -135,7 +135,7 @@
       <section class="step" data-step="4">
         <div class="summary-hero">
           <div class="big">&#127881;</div>
-          <h2>Done &mdash; your library is sorted</h2>
+          <h2>Done, your library is sorted</h2>
           <p class="lede">You can open Steam again now.</p>
         </div>
         <div class="stat-grid" id="summary-stats"></div>

@@ -1,4 +1,4 @@
-// Steam Classifier — wizard controller. Talks to the local Flask API.
+// Steam Classifier - wizard controller. Talks to the local Flask API.
 
 const steps = [...document.querySelectorAll('.step')];
 const segs  = [...document.querySelectorAll('.rail .seg')];
@@ -128,7 +128,7 @@ function renderPreview() {
   unknownPreviewRows.innerHTML = previewResult.unknown.map((g) => {
     return `<div class="row">
       <div class="name">${escapeHtml(g.name)} <span class="appid">#${g.app_id}</span></div>
-      <div class="change-map cat-same">Not recognised &mdash; sorted next step</div>
+      <div class="change-map cat-same">Not recognised, sorted next step</div>
     </div>`;
   }).join('') || '<p class="muted-note">Nothing unrecognised.</p>';
 }
@@ -222,7 +222,7 @@ async function loadInitialData() {
     steamIdInput.value = config.steam_id || '';
     if (config.api_key_set) {
       apiKeyInput.value = '';
-      apiKeyInput.placeholder = 'Saved — leave blank to keep';
+      apiKeyInput.placeholder = 'Saved (leave blank to keep)';
     }
   }
   if (statusRes.ok) {
