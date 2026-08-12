@@ -567,3 +567,63 @@ def save_learned(path, name, category):
     learned[name.lower().strip()] = category
     with open(path, "w", encoding="utf-8") as f:
         json.dump(learned, f, indent=2, ensure_ascii=False, sort_keys=True)
+
+
+class AmbiguousAccountError(Exception):
+    pass
+
+
+DEFAULT_STEAM_PATHS = [
+    Path("C:/Program Files (x86)/Steam"),
+    Path("C:/Program Files/Steam"),
+    Path.home() / "Steam",
+    Path.home() / ".steam" / "steam",
+]
+
+
+def list_steam_accounts(steam_path_override=None):
+    search = [Path(steam_path_override)] if steam_path_override else DEFAULT_STEAM_PATHS
+    accounts = []
+    for steam in search:
+        userdata = steam / "userdata"
+        if not userdata.exists():
+            continue
+        for d in userdata.iterdir():
+            if not (d.is_dir() and d.name.isdigit() and d.name != "0"):
+                continue
+            cloud = d / "config" / "cloudstorage" / "cloud-storage-namespace-1.json"
+            if cloud.exists():
+                accounts.append({"steam_id3": d.name, "cloud_json": cloud})
+    return accounts
+
+
+def find_cloud_json(steam_path_override=None, account_id3=None):
+    accounts = list_steam_accounts(steam_path_override)
+    if not accounts:
+        raise FileNotFoundError(
+            "Could not find cloud-storage-namespace-1.json. "
+            "Set a custom Steam path, e.g. D:/Steam"
+        )
+    if account_id3:
+        for a in accounts:
+            if a["steam_id3"] == account_id3:
+                return a["cloud_json"]
+        raise FileNotFoundError(f"No Steam account {account_id3} found.")
+    if len(accounts) > 1:
+        raise AmbiguousAccountError([a["steam_id3"] for a in accounts])
+    return accounts[0]["cloud_json"]
+
+
+def is_steam_running():
+    import subprocess, sys
+    try:
+        if sys.platform == "win32":
+            out = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq steam.exe"],
+                capture_output=True, text=True, timeout=5,
+            )
+            return "steam.exe" in out.stdout.lower()
+        out = subprocess.run(["pgrep", "-x", "steam"], capture_output=True, timeout=5)
+        return out.returncode == 0
+    except Exception:
+        return False
