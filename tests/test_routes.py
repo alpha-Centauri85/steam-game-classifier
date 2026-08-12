@@ -14,6 +14,16 @@ def test_config_post_then_get_masks_key(tmp_path):
     assert body["steam_id"] == "76561"
 
 
+def test_config_post_empty_key_preserves_saved_key(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/config", json={"api_key": "SECRET", "steam_id": "76561", "steam_path": ""})
+    # Returning session saves again with a blank key (already stored) — must keep it.
+    c.post("/api/config", json={"api_key": "", "steam_id": "76561", "steam_path": ""})
+    body = c.get("/api/config").get_json()
+    assert body["api_key_set"] is True
+    assert body["steam_id"] == "76561"
+
+
 def test_categories_route(tmp_path):
     body = _client(tmp_path).get("/api/categories").get_json()
     assert "ARPG" in body["categories"]

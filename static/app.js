@@ -58,26 +58,40 @@ function escapeHtml(s) {
   }[c]));
 }
 
+const NETWORK_ERROR = 'Could not reach the app. Is it still running? Check the window that launched it.';
+
 async function apiGet(path) {
-  const r = await fetch(path);
-  const j = await r.json().catch(() => ({}));
-  return { ok: r.ok, status: r.status, body: j };
+  try {
+    const r = await fetch(path);
+    const j = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, body: j };
+  } catch (e) {
+    return { ok: false, status: 0, body: { error: NETWORK_ERROR } };
+  }
 }
 
 async function apiPost(path, body, method = 'POST') {
-  const r = await fetch(path, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body || {}),
-  });
-  const j = await r.json().catch(() => ({}));
-  return { ok: r.ok, status: r.status, body: j };
+  try {
+    const r = await fetch(path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    const j = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, body: j };
+  } catch (e) {
+    return { ok: false, status: 0, body: { error: NETWORK_ERROR } };
+  }
 }
 
 async function apiDelete(path) {
-  const r = await fetch(path, { method: 'DELETE' });
-  const j = await r.json().catch(() => ({}));
-  return { ok: r.ok, status: r.status, body: j };
+  try {
+    const r = await fetch(path, { method: 'DELETE' });
+    const j = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, body: j };
+  } catch (e) {
+    return { ok: false, status: 0, body: { error: NETWORK_ERROR } };
+  }
 }
 
 function renderSetupBanner() {
@@ -207,7 +221,8 @@ async function loadInitialData() {
     config = cfgRes.body;
     steamIdInput.value = config.steam_id || '';
     if (config.api_key_set) {
-      apiKeyInput.placeholder = '•••••••••••••••• (saved — enter a new key to replace it)';
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = 'Saved — leave blank to keep';
     }
   }
   if (statusRes.ok) {
@@ -288,7 +303,9 @@ async function goStep1to2() {
   showError(setupError, '');
   const apiKey = apiKeyInput.value.trim();
   const steamId = steamIdInput.value.trim();
-  if (!apiKey) {
+  // The key may be left blank when one is already saved; the server keeps the
+  // stored key on save (merge) and falls back to it on preview.
+  if (!apiKey && !config.api_key_set) {
     showError(setupError, 'Enter your Steam Web API key to continue.');
     return false;
   }
@@ -296,16 +313,16 @@ async function goStep1to2() {
     showError(setupError, 'Enter your 64-bit Steam ID, or use Look up above.');
     return false;
   }
-  const saveRes = await apiPost('/api/config', {
-    api_key: apiKey,
-    steam_id: steamId,
-    steam_path: config.steam_path || '',
-  });
+  // Only send api_key when the user actually typed a new one; an empty value
+  // would otherwise be ignored by the server merge, so this is just tidy.
+  const savePayload = { steam_id: steamId, steam_path: config.steam_path || '' };
+  if (apiKey) savePayload.api_key = apiKey;
+  const saveRes = await apiPost('/api/config', savePayload);
   if (!saveRes.ok) {
     showError(setupError, saveRes.body.error || 'Could not save your settings.');
     return false;
   }
-  config.api_key_set = true;
+  if (apiKey) config.api_key_set = true;
   config.steam_id = steamId;
   return runPreview();
 }

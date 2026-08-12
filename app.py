@@ -49,10 +49,19 @@ def create_app(config_path=CONFIG_PATH_DEFAULT):
     @app.post("/api/config")
     def set_config():
         body = request.get_json(force=True)
+        cfg = load_config(app.config["CONFIG_PATH"])
+        # Merge: only overwrite a field when a non-empty value is supplied, so a
+        # returning user with an already-saved key can save without retyping it.
+        for field in ("api_key", "steam_id", "steam_path"):
+            value = (body.get(field) or "").strip()
+            if value:
+                cfg[field] = value
+            else:
+                cfg.setdefault(field, cfg.get(field, ""))
         save_config(app.config["CONFIG_PATH"], {
-            "api_key": body.get("api_key", ""),
-            "steam_id": body.get("steam_id", ""),
-            "steam_path": body.get("steam_path", ""),
+            "api_key": cfg.get("api_key", ""),
+            "steam_id": cfg.get("steam_id", ""),
+            "steam_path": cfg.get("steam_path", ""),
         })
         return jsonify({"ok": True})
 
@@ -81,8 +90,10 @@ def create_app(config_path=CONFIG_PATH_DEFAULT):
     @app.post("/api/resolve-id")
     def resolve_id():
         body = request.get_json(force=True)
+        cfg = load_config(app.config["CONFIG_PATH"])
+        api_key = body.get("api_key") or cfg.get("api_key") or ""
         try:
-            sid = core.resolve_steam_id(body.get("api_key", ""), body.get("profile", ""))
+            sid = core.resolve_steam_id(api_key, body.get("profile", ""))
             return jsonify({"steam_id": sid})
         except Exception as e:
             return jsonify({"error": str(e)}), 400
@@ -92,11 +103,15 @@ def create_app(config_path=CONFIG_PATH_DEFAULT):
         body = request.get_json(force=True)
         cfg = load_config(app.config["CONFIG_PATH"])
         path = cfg.get("steam_path") or None
+        api_key = body.get("api_key") or cfg.get("api_key") or ""
+        steam_id = body.get("steam_id") or cfg.get("steam_id") or ""
+        if not api_key or not steam_id:
+            return jsonify({"error": "Missing Steam API key or Steam ID. Please complete setup."}), 400
         try:
             cloud = core.find_cloud_json(path)
             with open(cloud, encoding="utf-8") as f:
                 data = json.load(f)
-            owned = core.get_owned_games(body["api_key"], body["steam_id"])
+            owned = core.get_owned_games(api_key, steam_id)
             learned = core.load_learned(core.CATEGORIES_FILE_DEFAULT)
             cs = core.build_change_set(owned, data, learned, overwrite=body.get("overwrite", False))
             return jsonify(cs)
