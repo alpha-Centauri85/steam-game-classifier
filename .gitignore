@@ -14,6 +14,9 @@ categories.json
 # Stray scratch files
 stuff.txt
 
+# Subagent-driven-development scratch workspace (git history is the record)
+.superpowers/
+
 # OS / editor
 Thumbs.db
 .DS_Store
