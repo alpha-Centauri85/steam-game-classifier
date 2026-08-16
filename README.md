@@ -94,6 +94,27 @@ python steam_categorizer_v2.py --api-key YOUR_KEY --steam-id YOUR_64BIT_ID --ste
 - Prompts you to categorise anything it doesn't recognise, saving your answers
   to `categories.json` so they carry over to future runs.
 
+## Running the tests
+
+```bash
+# Linux
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest
+
+# Windows
+python -m venv .venv
+.venv\Scripts\pip install -r requirements-dev.txt
+.venv\Scripts\python -m pytest
+```
+
+`requirements-dev.txt` includes `requirements.txt`, so it's the only install
+you need for a fresh clone. The launchers install just the runtime
+dependencies, so use this if you want to run the suite.
+
+The tests are offline: Steam API and community-tag lookups are stubbed, so
+nothing hits the network and no API key is needed.
+
 ## Notes
 
 - `categories.json` (your learned categories) and the timestamped backups are

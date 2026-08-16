@@ -1,0 +1,5 @@
+# Development dependencies. Installing this also pulls in the runtime ones,
+# so a fresh clone needs only:
+#   python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+-r requirements.txt
+pytest>=8.0
