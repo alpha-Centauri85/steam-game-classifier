@@ -577,6 +577,216 @@ def save_learned(path, name, category):
         json.dump(learned, f, indent=2, ensure_ascii=False, sort_keys=True)
 
 
+# --- Suggestions for unrecognised games ---------------------------------
+#
+# Two signals, tried in order:
+#   1. Franchise match against titles we already know. Offline and reliable:
+#      "Orcs Must Die! 3" inherits Tower Defence from "Orcs Must Die! 2".
+#   2. Steam user tags. Needed because Valve's own genre list is too coarse --
+#      it files Orcs Must Die! 3 under Action/Adventure/Strategy and never
+#      mentions tower defence at all.
+
+# Ordered most specific first: the first entry that appears in a game's tags
+# wins. That ordering is what makes "Tower Defense" beat "Co-op" and "Action"
+# on Orcs Must Die! 3, and "JRPG" beat "RPG" and "Action" on Kingdom Hearts.
+TAG_TO_CATEGORY = [
+    ("Tower Defense", "TOWER DEFENCE"),
+    ("Star Wars", "STAR WARS"),
+    ("LEGO", "LEGO"),
+    ("Soundtrack", "SOUNDTRACKS"),
+    ("Demo", "DEMO"),
+    ("MOBA", "MOBA"),
+    ("MMORPG", "MMO"),
+    ("Massively Multiplayer", "MMO"),
+    ("Looter Shooter", "LOOTER SHOOTER"),
+    ("JRPG", "JRPG"),
+    ("CRPG", "CRPG"),
+    ("Party-Based RPG", "CRPG"),
+    ("Grand Strategy", "GRAND STRATEGY"),
+    ("4X", "GRAND STRATEGY"),
+    ("Roguelite", "ACTION ROGUELITE"),
+    ("Roguelike", "ACTION ROGUELITE"),
+    ("Hack and Slash", "HACK & SLASH"),
+    ("Beat 'em up", "HACK & SLASH"),
+    ("Idle", "IDLE"),
+    ("Clicker", "IDLE"),
+    ("Tycoon", "MANAGEMENT/TYCOON"),
+    ("Management", "MANAGEMENT/TYCOON"),
+    ("City Builder", "MANAGEMENT/TYCOON"),
+    ("Base Building", "MANAGEMENT/TYCOON"),
+    ("Real Time Strategy", "RTS"),
+    ("RTS", "RTS"),
+    ("Turn-Based Strategy", "TURN BASED STRATEGY"),
+    ("Turn-Based Tactics", "TURN BASED STRATEGY"),
+    ("Turn-Based Combat", "TURN BASED STRATEGY"),
+    ("Fighting", "FIGHTING"),
+    ("2D Fighter", "FIGHTING"),
+    ("3D Fighter", "FIGHTING"),
+    ("Metroidvania", "PUZZLE&PLATFORM"),
+    ("Puzzle Platformer", "PUZZLE&PLATFORM"),
+    ("Platformer", "PUZZLE&PLATFORM"),
+    ("Puzzle", "PUZZLE&PLATFORM"),
+    ("Open World Survival Craft", "SANDBOX/SURVIVAL"),
+    ("Survival", "SANDBOX/SURVIVAL"),
+    ("Sandbox", "SANDBOX/SURVIVAL"),
+    ("Action RPG", "ARPG"),
+    ("FPS", "FPS"),
+    ("First-Person Shooter", "FPS"),
+    ("Racing", "SPORTS"),
+    ("Sports", "SPORTS"),
+    ("Football", "SPORTS"),
+    ("Farming Sim", "SIMULATION"),
+    ("Automobile Sim", "SIMULATION"),
+    ("Flight", "SIMULATION"),
+    ("Simulation", "SIMULATION"),
+    ("War", "BATTLE WARFARE"),
+    ("Military", "BATTLE WARFARE"),
+    ("RPG", "ARPG"),
+    ("Co-op", "CO-OP"),
+    ("Online Co-Op", "CO-OP"),
+    ("Action-Adventure", "ACTION/ADVENTURE"),
+    ("Adventure", "ACTION/ADVENTURE"),
+    ("Action", "ACTION/ADVENTURE"),
+]
+
+# A known title shorter than this is too generic to safely treat as a franchise
+# prefix -- without it, "Ink" would claim every game starting with those letters.
+MIN_FRANCHISE_KEY = 6
+
+STEAMSPY_URL = "https://steamspy.com/api.php"
+
+
+def _normalise_title(name):
+    key = re.sub(r"[^a-z0-9]+", " ", str(name).lower())
+    return " ".join(key.split())
+
+
+def franchise_match(name, learned=None):
+    """Find the longest already-categorised title this game is a sequel to."""
+    target = _normalise_title(name)
+    if not target:
+        return None
+    known = dict(GAME_CATEGORIES)
+    known.update(learned or {})
+    best = None
+    for title, category in known.items():
+        key = _normalise_title(title)
+        if len(key) < MIN_FRANCHISE_KEY or key == target:
+            continue
+        if not target.startswith(key):
+            continue
+        # Only a whole-word boundary counts, so "portal" can't swallow "portalis".
+        rest = target[len(key):]
+        if rest and not rest.startswith(" "):
+            continue
+        if best is None or len(key) > len(best[0]):
+            best = (key, title, category)
+    if best is None:
+        return None
+    return {"title": best[1], "category": best[2]}
+
+
+def fetch_steam_tags(app_id, http=requests):
+    """Community tags for a game, most-applied first. Empty list on any failure
+    -- suggestions are a convenience and must never break the wizard."""
+    try:
+        r = http.get(
+            STEAMSPY_URL,
+            params={"request": "appdetails", "appid": int(app_id)},
+            timeout=10,
+        )
+        r.raise_for_status()
+        tags = (r.json() or {}).get("tags") or {}
+    except Exception:
+        return []
+    if isinstance(tags, dict):
+        return [t for t, _ in sorted(tags.items(), key=lambda kv: -kv[1])]
+    if isinstance(tags, list):
+        return [str(t) for t in tags]
+    return []
+
+
+def categories_from_tags(tags):
+    """Every category the tags point at, best first, each paired with the tag
+    that triggered it so the UI can explain itself."""
+    lowered = {str(t).lower(): str(t) for t in tags}
+    hits, seen = [], set()
+    for tag, category in TAG_TO_CATEGORY:
+        if tag.lower() in lowered and category not in seen:
+            seen.add(category)
+            hits.append((category, lowered[tag.lower()]))
+    return hits
+
+
+def suggest_category(app_id, name, learned=None, tags=None):
+    tags = list(tags or [])
+    shown = tags[:6]
+    hits = categories_from_tags(tags)
+    match = franchise_match(name, learned)
+    if match:
+        return {
+            "app_id": app_id,
+            "name": name,
+            "category": match["category"],
+            "confidence": "high",
+            "reason": f'You already file "{match["title"].title()}" under '
+                      f'{collection_display(match["category"])}.',
+            "alternatives": [c for c, _ in hits if c != match["category"]][:3],
+            "tags": shown,
+        }
+    if hits:
+        category, hit_tag = hits[0]
+        others = [t for t in shown if t.lower() != hit_tag.lower()][:3]
+        reason = f'Steam players tag this "{hit_tag}"'
+        reason += f' (also {", ".join(others)}).' if others else "."
+        return {
+            "app_id": app_id,
+            "name": name,
+            "category": category,
+            "confidence": "medium",
+            "reason": reason,
+            "alternatives": [c for c, _ in hits[1:4]],
+            "tags": shown,
+        }
+    return {
+        "app_id": app_id,
+        "name": name,
+        "category": None,
+        "confidence": "none",
+        "reason": "No strong signal - pick whichever fits best.",
+        "alternatives": [],
+        "tags": shown,
+    }
+
+
+def suggest_categories(games, learned=None, http=requests, max_lookups=40):
+    """Suggest a category for each {app_id, name}.
+
+    Tags are fetched even when a franchise match already settles the category,
+    because the competing tags are the useful part: knowing Orcs Must Die! 3 is
+    tagged both Tower Defense and Third-Person Shooter is what lets you make
+    the call yourself.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    games = list(games or [])
+    tag_map = {}
+    if games and max_lookups:
+        targets = games[:max_lookups]
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            fetched = pool.map(
+                lambda g: (g.get("app_id"), fetch_steam_tags(g.get("app_id"), http)),
+                targets,
+            )
+            tag_map = dict(fetched)
+    return [
+        suggest_category(
+            g.get("app_id"), g.get("name", ""), learned, tag_map.get(g.get("app_id"))
+        )
+        for g in games
+    ]
+
+
 class AmbiguousAccountError(Exception):
     pass
 

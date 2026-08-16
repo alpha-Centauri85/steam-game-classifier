@@ -87,6 +87,16 @@ def create_app(config_path=CONFIG_PATH_DEFAULT):
     def categories():
         return jsonify({"categories": core.valid_categories()})
 
+    @app.post("/api/suggest")
+    def suggest():
+        body = request.get_json(force=True)
+        learned = core.load_learned(core.CATEGORIES_FILE_DEFAULT)
+        try:
+            suggestions = core.suggest_categories(body.get("games") or [], learned)
+            return jsonify({"suggestions": suggestions})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+
     @app.post("/api/resolve-id")
     def resolve_id():
         body = request.get_json(force=True)

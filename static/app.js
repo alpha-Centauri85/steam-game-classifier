@@ -39,6 +39,8 @@ let steamStatus = { running: true, cloud_found: false, accounts: [] };
 let categoriesList = [];
 let previewResult = { will_change: [], unknown: [], no_change: 0 };
 let unknownSelections = {}; // app_id -> category_key
+let suggestions = {};       // app_id -> suggestion from /api/suggest
+let suggestionsLoading = false;
 let applyResult = null;
 
 function showError(el, message) {
@@ -145,8 +147,11 @@ function renderUnknownStep() {
         return `<option value="${escapeHtml(c)}"${selected}>${escapeHtml(c)}</option>`;
       }))
       .join('');
-    return `<div class="row">
-      <div class="name">${escapeHtml(g.name)} <span class="appid">#${g.app_id}</span></div>
+    return `<div class="row unknown-row">
+      <div class="unknown-info">
+        <div class="name">${escapeHtml(g.name)} <span class="appid">#${g.app_id}</span></div>
+        ${renderSuggestion(g)}
+      </div>
       <select class="unknown-select" data-app-id="${g.app_id}" data-name="${escapeHtml(g.name)}">${options}</select>
     </div>`;
   }).join('');
@@ -159,8 +164,64 @@ function renderUnknownStep() {
       } else {
         delete unknownSelections[appId];
       }
+      updateApplyLede();
     });
   });
+
+  unknownRows.querySelectorAll('.alt-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      unknownSelections[btn.dataset.appId] = btn.dataset.cat;
+      renderUnknownStep();
+      updateApplyLede();
+    });
+  });
+}
+
+function renderSuggestion(g) {
+  const s = suggestions[g.app_id];
+  if (!s) {
+    return suggestionsLoading
+      ? '<div class="suggestion muted">Looking up a suggestion&hellip;</div>'
+      : '';
+  }
+  if (!s.category) {
+    return `<div class="suggestion muted">${escapeHtml(s.reason)}</div>`;
+  }
+  const label = s.confidence === 'high' ? 'Confident' : 'Best guess';
+  const alts = (s.alternatives || []).map((c) =>
+    `<button type="button" class="alt-chip" data-app-id="${g.app_id}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`
+  ).join('');
+  const tags = (s.tags || []).length
+    ? `<div class="tag-line">Tagged: ${escapeHtml(s.tags.join(', '))}</div>`
+    : '';
+  return `<div class="suggestion">
+      <span class="badge conf-${escapeHtml(s.confidence)}">${label}</span>
+      <span class="why">${escapeHtml(s.reason)}</span>
+    </div>
+    ${tags}
+    ${alts ? `<div class="alts"><span>Or:</span>${alts}</div>` : ''}`;
+}
+
+async function fetchSuggestions() {
+  const games = previewResult.unknown;
+  if (!games.length) return;
+  suggestionsLoading = true;
+  renderUnknownStep();
+  const res = await apiPost('/api/suggest', {
+    games: games.map((g) => ({ app_id: g.app_id, name: g.name })),
+  });
+  suggestionsLoading = false;
+  if (res.ok) {
+    (res.body.suggestions || []).forEach((s) => {
+      suggestions[s.app_id] = s;
+      // Pre-select so the common case is just "looks right, next".
+      if (s.category && !unknownSelections[s.app_id]) {
+        unknownSelections[s.app_id] = s.category;
+      }
+    });
+  }
+  renderUnknownStep();
+  updateApplyLede();
 }
 
 function buildAssignments() {
@@ -290,9 +351,11 @@ async function runPreview() {
   if (res.ok) {
     previewResult = res.body;
     unknownSelections = {};
+    suggestions = {};
     renderPreview();
     renderUnknownStep();
     updateApplyLede();
+    fetchSuggestions(); // network-bound; fills in behind the preview
     return true;
   }
   showError(previewError, res.body.error || 'Could not build a preview.');
@@ -374,6 +437,8 @@ function resetWizard() {
   overwriteCheckbox.checked = false;
   previewResult = { will_change: [], unknown: [], no_change: 0 };
   unknownSelections = {};
+  suggestions = {};
+  suggestionsLoading = false;
   applyResult = null;
   showError(setupError, '');
   showError(previewError, '');
