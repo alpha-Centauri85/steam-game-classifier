@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 venv/
 env/
+.pytest_cache/
 
 # Runtime state / local config (credentials, learned categories, backups)
 config.json

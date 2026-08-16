@@ -19,10 +19,17 @@ A guided, step-by-step wizard that runs in your browser.
 
 ### Launch
 
-Double-click `run_web.bat`, or run `python app.py` from a terminal. A browser
-tab opens automatically at http://127.0.0.1:5000. The wizard walks you through
-connecting your Steam account, previewing changes, sorting any new games, and
-applying the result.
+**Windows** — double-click `run_web.bat`, or run `python app.py` from a terminal.
+
+**Linux** — run `./run_web.sh` from a terminal. On first run it creates a
+project-local virtual environment in `.venv/` and installs the dependencies
+there, so nothing is written system-wide. This is what makes it work on
+immutable distros such as Bazzite, Fedora Silverblue, and SteamOS, where the
+system Python is read-only.
+
+A browser tab opens automatically at http://127.0.0.1:5000. The wizard walks you
+through connecting your Steam account, previewing changes, sorting any new games,
+and applying the result.
 
 > **Close and sign out of Steam on every device before applying.** Collections
 > sync through Steam Cloud, so if Steam is still signed in on another PC,
@@ -52,10 +59,14 @@ if you prefer it to the web app.
 
 ## Usage
 
-### Easy mode (Windows)
+### Easy mode
 
-Double-click `run_steam_tagger.bat`. It prompts for your API key and Steam ID,
-runs a preview (dry run) first, then asks before applying any changes.
+**Windows** — double-click `run_steam_tagger.bat`.
+**Linux** — run `./run_steam_tagger.sh`.
+
+Either one prompts for your API key and Steam ID, runs a preview (dry run)
+first, then asks before applying any changes. The Linux script bootstraps the
+same `.venv/` virtual environment as the web launcher.
 
 ### Command line
 
@@ -73,7 +84,11 @@ python steam_categorizer_v2.py --api-key YOUR_KEY --steam-id YOUR_64BIT_ID --ste
 ## How it works
 
 - Auto-detects your Steam install and locates
-  `cloud-storage-namespace-1.json` under `userdata`.
+  `cloud-storage-namespace-1.json` under `userdata`. On Linux this resolves via
+  `~/.steam/steam`, which native Steam symlinks to `~/.local/share/Steam`. If
+  you run Steam as a Flatpak, pass `--steam-path
+  ~/.var/app/com.valvesoftware.Steam/data/Steam` (or set the custom Steam path
+  in the web wizard).
 - Backs up that file (timestamped) before making any changes.
 - Matches each game against the built-in `GAME_CATEGORIES` map.
 - Prompts you to categorise anything it doesn't recognise, saving your answers
